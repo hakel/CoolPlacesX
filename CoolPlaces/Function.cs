@@ -36,40 +36,37 @@ namespace CoolPlaces
             response.Response = new ResponseBody();
             response.Response.ShouldEndSession = false;
 
+            // initialiize the variables we ultimately need for output, the response text and the card
             IOutputSpeech innerResponse = null;
             ICard responseCard = null;
-            CoolPlace myCoolPlace = null;
-            StandardCard myStandardCard = null;
-            CardImage myCardImage = null;
-
+            
             var log = context.Logger;
 
             log.LogLine($"CoolPlaces Skill Request Object:");
             log.LogLine(JsonConvert.SerializeObject(input));
 
             // Get what we need to get the zip code from the device
-            string deviceID = input.Context.System.Device.DeviceID;
-            string token = input.Context.System.ApiAccessToken;
-            string apiEndpoint = input.Context.System.ApiEndpoint;
+            string alexaDeviceID = input.Context.System.Device.DeviceID;
+            string alexaAPItoken = input.Context.System.ApiAccessToken;
+            string alexaAPIEndpoint = input.Context.System.ApiEndpoint;
             log.LogLine($"CoolPlaces Skill DeviceID:");
-            log.LogLine(deviceID);
+            log.LogLine(alexaDeviceID);
             log.LogLine($"CoolPlaces Skill APIAccessToken:");
-            log.LogLine(token);
+            log.LogLine(alexaAPItoken);
             log.LogLine($"CoolPlaces Skill APIEndpoint:");
-            log.LogLine(apiEndpoint);
+            log.LogLine(alexaAPIEndpoint);
 
+            //alexa url info
             string ep1 = "/v1/devices/";
             string ep2 = "/settings/address/countryAndPostalCode";
-
-            string ep3 = ep1 + deviceID + ep2;
-            string lookupURL = apiEndpoint + ep3;
+            string alexaLookupURL = alexaAPIEndpoint + ep1 + alexaDeviceID + ep2;
 
             log.LogLine($"CoolPlaces Skill DeviceLocationEndpoint:");
-            log.LogLine(lookupURL);
+            log.LogLine(alexaLookupURL);
 
             // this is where we get the location info from alexa.  
             //if it errors out, we know we dont have the permissions yet
-            string deviceLocationJSON = Utilities.GetDeviceLocation(token, lookupURL);
+            string deviceLocationJSON = Utilities.GetDeviceLocationFromAlexa(alexaAPItoken, alexaLookupURL);
 
             log.LogLine($"CoolPlaces Skill devicelocation result:");
             log.LogLine(deviceLocationJSON);
@@ -91,7 +88,7 @@ namespace CoolPlaces
                 log.LogLine(deviceLocationJSON);
 
 
-                zipCode = Utilities.GetDeviceZipCode(log, deviceLocationJSON, defaultZipCode); ;
+                zipCode = Utilities.ExtractDeviceZipCodeFromJSON(log, deviceLocationJSON, defaultZipCode); ;
                 log.LogLine($"CoolPlaces Skill zipcode:");
                 log.LogLine(zipCode);
             }
@@ -104,16 +101,18 @@ namespace CoolPlaces
             }
 
 
-            // variables                                                                  
-            string apiKey = "&key=AIzaSyCM0J-Drb3xKzY96XecL7khAfs33zM4Uac";
-            Utilities.PlaceType placeType = Utilities.PlaceType.bar;
-            int miles = 10;
+            // google variables                                                                  
+            string googleAPIKey = "&key=AIzaSyCM0J-Drb3xKzY96XecL7khAfs33zM4Uac";
+            Utilities.PlaceType googlePlaceType = Utilities.PlaceType.bar;
+            int googleMileRadiusForSearch = 10;
 
-            // fetch the location to use for the search using the zipcode
-            string loct = Utilities.GetLocationDataFromZip(zipCode, apiKey);
-            string baseLocation = "location=" + loct;
+            // fetch the location to use for the google search using the zipcode
+            string loct = Utilities.GetLocationDataForZipFromGoogle(zipCode, googleAPIKey);
+            string googleBaseLocationURLParam = "location=" + loct;
 
-            var allResources = Utilities.InitCoolPlaces(miles, baseLocation, placeType, apiKey);
+            // initialize the variables and fetch the cool places from google
+            var allResources = Utilities.InitCoolPlaces(googleMileRadiusForSearch, googleBaseLocationURLParam, googlePlaceType, googleAPIKey);
+            // grab a result from all of the results
             var resource = allResources.FirstOrDefault();
 
             string responseText = "";
@@ -138,34 +137,19 @@ namespace CoolPlaces
                 }
                 else
                 {
+                    // everything is fine, so log where we landed
+                    // we will create the response text and card at the end of this routine
                     log.LogLine($"CoolPlaces : Dont Need Permissions");
                     log.LogLine($"CoolPlaces LaunchRequest");
-                    // ****START
-                    myCoolPlace = Utilities.EmitCoolPlace(resource);
-
-                    innerResponse = new PlainTextOutputSpeech();
-                    responseText = myCoolPlace.Name;
-                    (innerResponse as PlainTextOutputSpeech).Text = resource.GetCoolPlaceOpenMessage + responseText;
-
-                    //SimpleCard mySimpleCard = new SimpleCard();
-                    //responseCard = new AskForPermissionsConsentCard();
-                    //responseCard = new LinkAccountCard();
-                    myStandardCard = new StandardCard();
-                    myCardImage = new CardImage();
-                    myCardImage.SmallImageUrl = myCoolPlace.Photo.PhotoAPIURL(720, apiKey);
-                    myCardImage.LargeImageUrl = myCoolPlace.Photo.PhotoAPIURL(1200, apiKey);
-                    myStandardCard.Image = myCardImage;
-
-                    myStandardCard.Content = myCoolPlace.Name + "\r\n" + myCoolPlace.Location + "\r\n Rating " + myCoolPlace.Rating + " out of 5" + "\r\n";
-                    myStandardCard.Title = myCoolPlace.Name;
-                    responseCard = myStandardCard;
-                    // ****END
                 }
+
+
             }
             else if (input.GetRequestType() == typeof(IntentRequest))
             {
                 var intentRequest = (IntentRequest)input.Request;
 
+                // create response text for intents other than the full cool place response, we will do that one at the end
                 switch (intentRequest.Intent.Name)
                 {
                     case "AMAZON.CancelIntent":
@@ -199,61 +183,14 @@ namespace CoolPlaces
                         response.Response.ShouldEndSession = true;
                         break;
                     case "GetCoolPlaceIntent":
+                        // everything is fine, so log where we landed
+                        // we will create the response text and card at the end of this routine
                         log.LogLine($"CoolPlaces GetCoolPlaceIntent sent: send cool place");
-                        // ****START
-                        myCoolPlace = Utilities.EmitCoolPlace(resource);
-
-                        innerResponse = new PlainTextOutputSpeech();
-                        responseText = myCoolPlace.Name;
-                        (innerResponse as PlainTextOutputSpeech).Text = resource.GetCoolPlaceOpenMessage + responseText;
-
-                        //SimpleCard mySimpleCard = new SimpleCard();
-                        //responseCard = new AskForPermissionsConsentCard();
-                        //responseCard = new LinkAccountCard();
-                        myStandardCard = new StandardCard();
-                        myCardImage = new CardImage();
-                        myCardImage.SmallImageUrl = myCoolPlace.Photo.PhotoAPIURL(720, apiKey);
-                        myCardImage.LargeImageUrl = myCoolPlace.Photo.PhotoAPIURL(1200, apiKey);
-                        myStandardCard.Image = myCardImage;
-
-                        myStandardCard.Content = myCoolPlace.Name + "\r\n" + myCoolPlace.Location + "\r\n Rating " + myCoolPlace.Rating + " out of 5" + "\r\n";
-                        myStandardCard.Title = myCoolPlace.Name;
-                        responseCard = myStandardCard;
-                        // ****END
-
-                        //innerResponse = new PlainTextOutputSpeech();
-                        //responseText = Utilities.EmitCoolPlace(resource).Name;
-                        //(innerResponse as PlainTextOutputSpeech).Text = responseText;
-
                         break;
                     case "GetNewCoolPlaceIntent":
+                        // everything is fine, so log where we landed
+                        // we will create the response text and card at the end of this routine
                         log.LogLine($"CoolPlaces GetNewCoolPlaceIntent sent: send new cool place");
-                        // ****START
-                        myCoolPlace = Utilities.EmitCoolPlace(resource);
-
-                        innerResponse = new PlainTextOutputSpeech();
-                        responseText = myCoolPlace.Name;
-                        (innerResponse as PlainTextOutputSpeech).Text = resource.GetCoolPlaceOpenMessage + responseText;
-
-                        //SimpleCard mySimpleCard = new SimpleCard();
-                        //responseCard = new LinkAccountCard();
-                        myStandardCard = new StandardCard();
-                        myCardImage = new CardImage();
-                        myCardImage.SmallImageUrl = myCoolPlace.Photo.PhotoAPIURL(720, apiKey);
-                        myCardImage.LargeImageUrl = myCoolPlace.Photo.PhotoAPIURL(1200, apiKey);
-                        myStandardCard.Image = myCardImage;
-
-                        myStandardCard.Content = myCoolPlace.Name + "\r\n" + myCoolPlace.Location + "\r\n Rating " + myCoolPlace.Rating + " out of 5" + "\r\n";
-                        myStandardCard.Title = myCoolPlace.Name;
-                        responseCard = myStandardCard;
-                        // ****END
-
-
-                        //innerResponse = new PlainTextOutputSpeech();
-                        //responseText = Utilities.EmitCoolPlace(resource).Name;
-                        //(innerResponse as PlainTextOutputSpeech).Text = responseText;
-
-
                         break;
                     default:
                         log.LogLine($"CoolPlaces Unknown intent: " + intentRequest.Intent.Name);
@@ -263,6 +200,49 @@ namespace CoolPlaces
                 }
             }
 
+            // if we have no response to this point, then we need to get a cool place!!
+            if (innerResponse == null)
+            {
+
+                log.LogLine($"CoolPlaces : form the response text and card for the cool place");
+
+                CoolPlace myCoolPlace = null;
+                StandardCard myStandardCard = null;
+                CardImage myCardImage = null;
+
+                // ****START
+                // grab info from the API return values and format for alexa card
+                myCoolPlace = Utilities.EmitCoolPlace(resource);
+
+                innerResponse = new PlainTextOutputSpeech();
+                responseText = myCoolPlace.Name;
+                (innerResponse as PlainTextOutputSpeech).Text = resource.GetCoolPlaceOpenMessage + responseText;
+
+                //SimpleCard mySimpleCard = new SimpleCard();
+                //responseCard = new AskForPermissionsConsentCard();
+                //responseCard = new LinkAccountCard();
+                myStandardCard = new StandardCard();
+                myCardImage = new CardImage();
+                myCardImage.SmallImageUrl = myCoolPlace.Photo.PhotoAPIURL(720, googleAPIKey);
+                myCardImage.LargeImageUrl = myCoolPlace.Photo.PhotoAPIURL(1200, googleAPIKey);
+                myStandardCard.Image = myCardImage;
+
+                myStandardCard.Content = myCoolPlace.Name + "\r\n" + myCoolPlace.Location + "\r\n Rating " + myCoolPlace.Rating + " out of 5" + "\r\n";
+                myStandardCard.Title = myCoolPlace.Name;
+                responseCard = myStandardCard;
+                // ****END
+            }
+            
+            /*
+            //accesstoken
+            //input.Context.System.User.AccessToken;
+            //input.Context.System.User.UserId;
+            User myUser = input.Context.System.User;
+            log.LogLine($"CoolPlaces Skill User Object:");
+            log.LogLine(JsonConvert.SerializeObject(myUser));
+            */
+
+            // take whatever card and/or response we have and send it to alexa
             response.Response.OutputSpeech = innerResponse;
             response.Response.Card = responseCard;
             response.Version = "1.0";

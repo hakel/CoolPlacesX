@@ -30,7 +30,7 @@ namespace CoolPlaces
             enUSResource.StopMessage = "Goodbye!";
 
             // Fetch the data
-            enUSResource.CoolPlaces = FetchCoolPlaces(miles, baseLocation, placeType, apiKey);
+            enUSResource.CoolPlaces = GetCoolPlacesFromGoogle(miles, baseLocation, placeType, apiKey);
 
             resources.Add(enUSResource);
 
@@ -45,7 +45,7 @@ namespace CoolPlaces
         /// <param name="placeType"></param>
         /// <param name="apiKey"></param>
         /// <returns></returns>
-        public static List<CoolPlace> FetchCoolPlaces(int miles, string baseLocation, PlaceType placeType, string apiKey)
+        public static List<CoolPlace> GetCoolPlacesFromGoogle(int miles, string baseLocation, PlaceType placeType, string apiKey)
         {
             List<CoolPlace> coolPlaces = new List<CoolPlace>();
             //https://developers.google.com/places/web-service/search#find-place-examples
@@ -143,7 +143,7 @@ namespace CoolPlaces
         /// <param name="zipCode"></param>
         /// <param name="apiKey"></param>
         /// <returns></returns>
-        public static string GetLocationDataFromZip(string zipCode, string apiKey)
+        public static string GetLocationDataForZipFromGoogle(string zipCode, string apiKey)
         {
 
             string baseUrl = "https://maps.googleapis.com/maps/api/geocode";
@@ -211,7 +211,7 @@ namespace CoolPlaces
         }
         */
 
-        public static string GetDeviceZipCode(ILambdaLogger log,string json, string defaultZipCode)
+        public static string ExtractDeviceZipCodeFromJSON(ILambdaLogger log,string json, string defaultZipCode)
         {
             // parse out the zip code and return it
             /*
@@ -236,7 +236,7 @@ namespace CoolPlaces
             return zipCode;
         }
 
-        public static string GetDeviceLocation(string apiAccessToken, string url)
+        public static string GetDeviceLocationFromAlexa(string apiAccessToken, string url)
         {
 
             string responsex = "";
